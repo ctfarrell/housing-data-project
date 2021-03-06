@@ -1,0 +1,52 @@
+def prep_std_data(dataframe):
+    min_max_scaler = preprocessing.MinMaxScaler()
+    dataframe.drop(['ADW', 'AGDW', 'AGPS', 'AGSW', 'BSMP', 'CBWX6', 'CBWX8',
+       'CDW', 'CP', 'CPAFD', 'CPDFD', 'CPSF', 'CPSM', 'CSL', 'FFA', 'FFB',
+       'FUA', 'GEP', 'MFA', 'MFB', 'MUA', 'MUB', 'MW', 'OP', 'OP2', 'PCA',
+       'PCB', 'PCF', 'PCS', 'PS', 'SEP', 'SOHD DED-A', 'SOHD DED-L', 'WC',
+       'WD', 'floor_carpet', 'floor_ceramic', 'floor_hardwood',
+       'floor_linoleum', 'floor_none', 'floor_parquet', 'floor_softwood',
+       'floor_stone', 'County Name',
+       'School District', 'is_homestead', 'over_65',
+       'Occupancy Type', 'Year Built', 'Construction Type', 'Roof Type',
+       'Fireplace', 'Foundation Type', 'Floor Type', 'City', 'Land Value', 'Sec-Twp-Rng'], 
+        axis = 1,
+        inplace = True)
+    dataframe.insert(loc = 1,column='sub_cat', value=median_categorize_subdivision(list(dataframe.Subdivision)))
+    dataframe.insert(1,'sqft_total',[f1+f2+f3 for f1,f2,f3 in zip(list(dataframe['sqft_first_floor']),list(dataframe['sqft_second_floor']),list(dataframe['sqft_bsmt_total']))])
+    dataframe.insert(1,'baths_total',[b1+(b2/2) for b1,b2 in zip(list(dataframe['baths_full']),list(dataframe['baths_half']))])
+    dataframe.insert(1,'grade_1',[g[0:2] for g in list(dataframe.Grade)])
+    dataframe.grade_1.replace("D","D6",inplace = True)
+    dataframe["code_grade_2"] = dataframe["grade_1"].astype('category').cat.codes
+    dataframe["code_story_height"] = dataframe["Story Height"].astype('category').cat.codes
+    dataframe["code_sale_year"] = dataframe["Sale Year"].astype('category').cat.codes
+    dataframe["code_heat_ac"] = dataframe["heat_ac"].astype('category').cat.codes 
+    dataframe.baths_total.fillna(mode(dataframe.baths_total),inplace = True)
+    dataframe['Effective Age'].fillna(median(dataframe['Effective Age']),inplace = True)
+    dataframe['Effective Age'].replace(99,35,inplace = True)
+    dataframe['sqft_total'].replace(0,median(dataframe.sqft_total),inplace = True)
+    dataframe['Total Acres'].replace(0,median(dataframe['Total Acres']),inplace = True)
+    dataframe['sqft_total'].mask(dataframe['sqft_total']>5000,other = 5000,inplace = True)
+    dataframe['code_story_height'].replace(-1,5,inplace = True)
+    scaled_df = pd.DataFrame(min_max_scaler.fit_transform(dataframe[['baths_total','Effective Age','sqft_total','Total Acres']].values))
+    dataframe = pd.concat([dataframe, scaled_df], axis=1)
+    try:
+        dataframe['SalePrice'].mask(dataframe['SalePrice']>1000000,other = 1000000,inplace = True)
+        target = list(dataframe.SalePrice)
+    except:
+        target = None
+    try:
+        predictors = dataframe.drop(['heat_ac', 'baths_full', 'baths_half', 'Subdivision', 'sqft_first_floor',
+       'sqft_bsmt_unfinished', 'sqft_second_floor', 'sqft_bsmt_fin_partition',
+       'sqft_bsmt_fin_no_part', 'sqft_bsmt_total', 'Grade','grade_1', 'Story Height','SalePrice','Sale Year','parcel_id','baths_total','Effective Age','sqft_total','Total Acres'], 
+        axis = 1)
+    except:
+        predictors = dataframe.drop(['heat_ac', 'baths_full', 'baths_half', 'Subdivision', 'sqft_first_floor',
+       'sqft_bsmt_unfinished', 'sqft_second_floor', 'sqft_bsmt_fin_partition',
+       'sqft_bsmt_fin_no_part', 'sqft_bsmt_total', 'Grade','grade_1', 'Story Height','Sale Year','parcel_id','baths_total','Effective Age','sqft_total','Total Acres'], 
+        axis = 1)
+    prep_df = dataframe.drop(['heat_ac', 'baths_full', 'baths_half', 'Subdivision', 'sqft_first_floor',
+       'sqft_bsmt_unfinished', 'sqft_second_floor', 'sqft_bsmt_fin_partition',
+       'sqft_bsmt_fin_no_part', 'sqft_bsmt_total', 'Grade','grade_1', 'Story Height','Sale Year','parcel_id','baths_total','Effective Age','sqft_total','Total Acres'],
+        axis = 1)
+    return predictors,target,prep_df  
